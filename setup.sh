@@ -1,40 +1,23 @@
 #!/bin/bash
 
-if [ ! $1 ] || [ ! $2 ]; then
-   echo "Missing argument"
-   echo "Usage: setup.sh [SSID] [PASSWORD]" 
-   exit 1
-fi
-
-if [ $(echo whoami) != "root" ]; then
-   echo "Permission Denied"
-   exit 1
-fi
-
 # Update the system
 dnf -y update
 
-# Create jellyfin group
-groupadd -U conman jellyfin
+# Tell SELinux it is ok to allow systemd to manipulate its Cgroups configuration
+setsebool -P container_manage_cgroup true
 
-# Make media directories
+# Make a copy of fstab before making changes
+cp /etc/fstab ~/fstab
+
+# Mount NFS shares
+# NFS_SERVER_IP:EXPORTED_DIRECTORY MOUNT_POINT
+echo "192.168.0.10:/movies /mnt/movies  nfs      defaults    0       0 " >> /etc/fstab
+echo "192.168.0.10:/shows /mnt/shows  nfs      defaults    0       0 " >> /etc/fstab
+echo "192.168.0.10:/music /mnt/music  nfs      defaults    0       0 " >> /etc/fstab
+echo "192.168.0.10:/photos /mnt/photos  nfs      defaults     0     0" >> /etc/fstab   
+
+# Create local media directories
 mkdir -p /etc/opt/jellyfin/config
 mkdir -p /var/cache/jellyfin/cache
-mkdir -p /srv/jellyfin/media/{movies,shows,music,photos}
-
-# Change owner and group
-chown -R root:jellyfin /srv/jellyfin
-chown -R root:jellyfin /etc/opt/jellyfin
-chown -R root:jellyfin /var/cache/jellyfin
-
-# Setup wifi connection
-ENABLED=$(nmcli radio wifi)
-
-# If wifi radio is not enabled, turn it on
-[[ $ENABLED != "enabled" ]] && nmcli radio wifi on
-
-# Connect to wifi network
-nmcli dev wifi connect $1 password $2
-
-# Clear bash history
-history -c
+mkdir -p /mnt/{movies,shows,music,photos}
+mkdir -p /srv/local/media/{dvr,movies,shows,music,photos}
